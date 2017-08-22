@@ -1,0 +1,48 @@
+{% extends "bootstrap/base.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block navbar %}
+<div class="navbar navbar-default" role="navigation">
+    <div class="container">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="/">Ledger</a>
+        </div>
+        <div class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+                <li><a href="/">home</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Ledger</h1>
+    </div>
+    <table class="table table-bordered table-striped">
+        <tr>
+            <th>Item</th>
+            <th>By</th>
+            <th>Split with</th>
+            <th>Price</th>
+        </tr>
+        {% for purchase in purchases %}
+        <tr>
+            <td>{{ purchase.item }}</td>
+            <td>{{ purchase.by }}</td>
+            <td>{{ purchase.split }}</td>
+            <td>${{ "%.2f" % purchase.price }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {{ wtf.quick_form(form) }}
+</div>
+{% endblock %}
