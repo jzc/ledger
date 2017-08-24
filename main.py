@@ -11,8 +11,8 @@ from wtforms.validators import Required
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-app.config['DEBUG'] = True
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.config["DEBUG"] = True
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(basedir, "data.sqlite")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = "key"
@@ -21,7 +21,8 @@ manager = Manager(app)
 bootstrap = Bootstrap(app)
 
 def make_shell_context():
-    return dict(app=app, db=db, User=User, Purchase=Purchase)
+    return dict(app=app, db=db, User=User, Purchase=Purchase, Due=Due)
+
 manager.add_command("shell", Shell(make_context=make_shell_context))
 
 class AddForm(FlaskForm):
@@ -34,10 +35,10 @@ class AddForm(FlaskForm):
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(64))
-    dues = db.Column(db.Integer)
-    def __repr__(self):
-        return "<User (%s, %s, %s)>" % (self.id, self.name, self.dues)
+    name = db.Column(db.String(64), unique=True)
+    dues = db.relationship("Due", foreign_keys="Due.owner_id", backref="owner")
+    def __repr__(self): 
+        return "<User %s (%s)>" % (self.id, self.name)
 
 class Purchase(db.Model):
     __tablename__ = "purchases"
@@ -49,21 +50,48 @@ class Purchase(db.Model):
     price = db.Column(db.Float)
 
     def __repr__(self):
-        return "<Purchase (%s, %s, %s, %s, %s)>" % (self.id, self.item, self.by.name, self.split, self.price)
+        return "<Purchase %s (%s, %s, %s)>" % (self.id, self.item, self.by.name, self.price)
+
+class Due(db.Model):
+    __tablename__ = "dues"
+    owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    to_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    to = db.relationship("User", foreign_keys="Due.to_id")
+    amount = db.Column(db.Integer)
+
+    def __repr__(self):
+        return "<Due %s, %s (%s)>" % (self.owner_id, self.to_id, self.amount)
 
 @app.route("/", methods=["GET","POST"])
 def index():
     form = AddForm()
     if form.validate_on_submit():
         #float validation
-        p = Purchase(item=form.item.data, by=form.by.data, split=form.split.data, price=form.price.data)
-        form.item.data = ""
-        form.by.data = ""
-        form.split.data = ""
-        form.price.data = ""
-        db.session.add(p)
-        db.session.commit()
-        #new item add animation
+        owner_user = User.query.filter_by(name=form.by.data).first()
+        if owner_user:
+            p = Purchase(item=form.item.data, by=owner_user, split=form.split.data, price=form.price.data)
+            split_list = User.query.filter(User.name != p.by.name).all()
+            split_price = p.price/User.query.count()
+            for to_user in split_list:
+                forward = Due.query.filter_by(owner_id=to_user.id, to_id=owner_user.id).first()
+                if not forward:
+                    forward = Due(owner=to_user,to=owner_user, amount=0)
+                backward = Due.query.filter_by(owner_id=owner_user.id, to_id=to_user.id).first()
+                if not backward:
+                    backward = Due(owner=owner_user,to=to_user, amount=0)
+                forward.amount += split_price
+                m = min(forward.amount, backward.amount)
+                forward.amount -= m
+                backward.amount -= m
+                db.session.add(forward)
+                db.session.add(backward)
+            form.item.data = ""
+            form.by.data = ""
+            form.split.data = ""
+            form.price.data = ""
+            db.session.add(p)
+            db.session.commit()
+            #new item add animation
         return redirect(url_for("index"))
     users = User.query.all()
     n_users = len(users)
