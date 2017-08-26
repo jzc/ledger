@@ -1,6 +1,21 @@
 {% extends "bootstrap/base.html" %}
 {% import "bootstrap/wtf.html" as wtf %}
 
+{% block head %}
+{{ super() }}
+
+<script
+  src="https://code.jquery.com/jquery-3.2.1.min.js"
+  integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+  crossorigin="anonymous"></script>
+
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.4/css/bootstrap-select.min.css">
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.4/js/bootstrap-select.min.js"></script>
+{% endblock %}
+
 {% block navbar %}
 <div class="navbar navbar-default" role="navigation">
     <div class="container">
@@ -43,7 +58,36 @@
         </tr>
         {% endfor %}
     </table>
-    {{ wtf.quick_form(form) }}
+    <!-- {{ wtf.quick_form(form) }} -->
+
+    <form method="POST"  class="form-inline">
+        {{ form.csrf_token }}
+        <div class="form-group">
+            {{ form.item(class="form-control", placeholder="Item name", required=True) }}
+        </div>
+        <div class="form-group">
+            <div class="input-group">
+                <div class="input-group-addon">$</div>
+                {{ form.price(class="form-control", placeholder="Price", required=True) }}
+            </div>
+        </div>
+        <div class="form-group" >
+            {{ form.split(**{"class": "selectpicker", "title": "Split", "data-max-options": "1"}) }}
+            <span class="glyphicon glyphicon-question-sign" 
+            title="Select the people to split the purchase with. Select none to split with everyone."></span>
+        </div>
+        {{ form.submit(class="btn btn-primary") }}
+    </form>
+    {% if form.errors %}
+    <ul class="errors">
+        {% for field_name, field_errors in form.errors|dictsort if field_errors %}
+            {% for error in field_errors %}
+                <li>{{ form[field_name].label }}: {{ error }}</li>
+            {% endfor %}
+        {% endfor %}
+    </ul>
+{% endif %}
+
     <div class="page-header">
         <h1>Dues</h1>
     </div>
@@ -64,7 +108,7 @@
                     {% for due in users[3*i+j].dues %}
                     <tr>
                         <td>{{ due.to.name }}</td>
-                        <td>{{ due.amount }}</td>
+                        <td>${{ "%.2f" % due.amount }}</td>
                     </tr>
                     {% endfor %}
                 </table>

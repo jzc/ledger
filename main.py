@@ -6,8 +6,8 @@ from flask_script import Manager, Shell
 from flask_bootstrap import Bootstrap
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, FloatField
-from wtforms.validators import Required
+from wtforms import StringField, SubmitField, DecimalField, SelectMultipleField
+from wtforms.validators import Required, ValidationError
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
@@ -25,12 +25,19 @@ def make_shell_context():
 
 manager.add_command("shell", Shell(make_context=make_shell_context))
 
-class AddForm(FlaskForm):
+class AddPurchaseForm(FlaskForm):
+    def number_check(form, field):
+        try: 
+            number = float(field.data)
+        except:
+            raise ValidationError("Please enter a number.")
+        if math.isinf(number) or math.isnan(number):
+            raise ValidationError("Please enter a valid number.")
+
     item = StringField("Item", validators=[Required()])
-    by = StringField("By", validators=[Required()])
-    split = StringField("Split")
-    price = FloatField("Price", validators=[Required()])
-    submit = SubmitField("Submit")
+    split = SelectMultipleField("Split")
+    price = StringField("Price", validators=[Required(), number_check])
+    submit = SubmitField("Add purchase")
 
 class User(db.Model):
     __tablename__ = "users"
@@ -64,9 +71,10 @@ class Due(db.Model):
 
 @app.route("/", methods=["GET","POST"])
 def index():
-    form = AddForm()
+    form = AddPurchaseForm()
+    form.split.choices = [(u.id, u.name) for u in User.query.all()]
     if form.validate_on_submit():
-        #float validation
+        #float validation (check for nan/inf)
         owner_user = User.query.filter_by(name=form.by.data).first()
         if owner_user:
             p = Purchase(item=form.item.data, by=owner_user, split=form.split.data, price=form.price.data)
@@ -92,7 +100,8 @@ def index():
             db.session.add(p)
             db.session.commit()
             #new item add animation
-        return redirect(url_for("index"))
+            return redirect(url_for("index"))
+
     users = User.query.all()
     n_users = len(users)
     n_rows = math.ceil(n_users/3.0)
